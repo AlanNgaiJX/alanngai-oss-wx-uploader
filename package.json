@@ -1,8 +1,8 @@
 {
-  "name": "vue-router-refresh-helper",
+  "name": "alanngai-oss-wx-uploader",
   "version": "1.0.0",
   "description": "vue router refresh helper",
-  "main": "dist/vue-router-refresh-helper.js",
+  "main": "dist/alanngai-oss-wx-uploader.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "webpack --config ./webpack.production.config.js",
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:AlanNgaiJX/vue-router-refresh-helper.git"
+    "url": "git@github.com:AlanNgaiJX/alanngai-oss-wx-uploader.git"
   },
   "author": "AlanNgai",
   "license": "ISC",
