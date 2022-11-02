@@ -31,6 +31,7 @@ class Uploader {
     /* 回调 */
     this.onComputedId = null; // 单个文件初始化成功事件
     this.onComputedMd5 = null; // 单个文件计算 md5
+    this.onUploading = null; // 单个文件正在上传
     this.onSuccess = null; // 单个文件成功事件
     this.onError = null; // 单个文件失败事件
     this.onAllFinish = null; // 全部上传已执行事件（忽略失败任务）
@@ -40,11 +41,7 @@ class Uploader {
   }
 
   // 【 选择文件 】
-  chooseFile({
-    count,
-    sourceType,
-    mediaType
-  }, callbacks) {
+  chooseFile({ count, sourceType, mediaType }, callbacks) {
     this.choosing = true;
     wx.chooseMedia({
       count: count || 1,
@@ -52,9 +49,14 @@ class Uploader {
       sourceType: sourceType || ["album", "camera"],
       camera: "back",
       success: (res) => {
-        this.uploadFiles(Object.assign({
-          files: res.tempFiles
-        }, callbacks));
+        this.uploadFiles(
+          Object.assign(
+            {
+              files: res.tempFiles,
+            },
+            callbacks
+          )
+        );
       },
       complete: () => {
         this.choosing = false;
@@ -67,6 +69,7 @@ class Uploader {
     files,
     onComputedId,
     onComputedMd5,
+    onUploading,
     onProgress,
     onSuccess,
     onAllFinish,
@@ -85,6 +88,7 @@ class Uploader {
     _this.onAllFinish = onAllFinish;
     _this.onAllSuccess = onAllSuccess;
     _this.onProgress = onProgress;
+    _this.onUploading = onUploading;
 
     let i = 0;
 
@@ -97,6 +101,7 @@ class Uploader {
         _this.isCheckingQueue = true;
         const uploadTask = _this.waitingQueue.shift();
         _this.uploadingQueue.push(uploadTask);
+        onUploadUploading(uploadTask);
         getSignature()
           .then(() => uploadToOss(uploadTask))
           .catch(() => {
@@ -190,9 +195,9 @@ class Uploader {
     // 上传到oss
     function uploadToOss(uploadTask) {
       wx.uploadFile({
-        url: !_this.debug ?
-          _this.signatureInfo.host :
-          _this.signatureInfo.host + "123",
+        url: !_this.debug
+          ? _this.signatureInfo.host
+          : _this.signatureInfo.host + "123",
         filePath: uploadTask.filePath,
         name: "file",
         formData: {
@@ -229,9 +234,7 @@ class Uploader {
             cbFail();
           }
         },
-        fail: function ({
-          errMsg
-        }) {
+        fail: function ({ errMsg }) {
           // 上传失败
           cbFail();
         },
@@ -259,6 +262,14 @@ class Uploader {
       onUploadProgress(uploadTask, "md5");
       if (typeof _this.onComputedMd5 == "function") {
         _this.onComputedMd5(Object.assign({}, uploadTask));
+      }
+    }
+
+    // 上传中回调处理器
+    function onUploadUploading(uploadTask) {
+      onUploadProgress(uploadTask, "uploading");
+      if (typeof _this.onUploading == "function") {
+        _this.onUploading(Object.assign({}, uploadTask));
       }
     }
 
@@ -320,13 +331,7 @@ class Uploader {
   retryErrorQueue() {
     while (this.errorQueue.length) {
       const uploadTask = this.errorQueue.shift();
-      const {
-        id,
-        url,
-        suffix,
-        filePath,
-        md5
-      } = uploadTask;
+      const { id, url, suffix, filePath, md5 } = uploadTask;
       const _uploadTask = {
         id,
         url,
@@ -350,13 +355,7 @@ class Uploader {
     );
     if (uploadTaskIndex > -1) {
       const uploadTask = this.errorQueue.splice(uploadTaskIndex, 1)[0];
-      const {
-        id,
-        url,
-        suffix,
-        filePath,
-        md5
-      } = uploadTask;
+      const { id, url, suffix, filePath, md5 } = uploadTask;
       const _uploadTask = {
         id,
         url,
@@ -377,7 +376,7 @@ class Uploader {
   // 【 从任何队列移除某一任务 】
   delTaskById(taskId) {
     const task = {
-      id: Number(taskId)
+      id: Number(taskId),
     };
     Uploader.removeOutOf(this.waitingQueue, task);
     Uploader.removeOutOf(this.uploadingQueue, task);
@@ -413,7 +412,7 @@ var MD5 = (function (r) {
     var e = (t[o] = {
       i: o,
       l: !1,
-      exports: {}
+      exports: {},
     });
     return r[o].call(e.exports, e, e.exports, n), (e.l = !0), e.exports;
   }
@@ -434,13 +433,13 @@ var MD5 = (function (r) {
     }),
     (n.n = function (r) {
       var t =
-        r && r.__esModule ?
-        function () {
-          return r.default;
-        } :
-        function () {
-          return r;
-        };
+        r && r.__esModule
+          ? function () {
+              return r.default;
+            }
+          : function () {
+              return r;
+            };
       return n.d(t, "a", t), t;
     }),
     (n.o = function (r, n) {
@@ -482,14 +481,14 @@ var MD5 = (function (r) {
         e = t(3),
         u = t(0).bin,
         i = function (r, t) {
-          r.constructor == String ?
-            (r =
-              t && "binary" === t.encoding ?
-              u.stringToBytes(r) :
-              o.stringToBytes(r)) :
-            e(r) ?
-            (r = Array.prototype.slice.call(r, 0)) :
-            Array.isArray(r) || (r = r.toString());
+          r.constructor == String
+            ? (r =
+                t && "binary" === t.encoding
+                  ? u.stringToBytes(r)
+                  : o.stringToBytes(r))
+            : e(r)
+            ? (r = Array.prototype.slice.call(r, 0))
+            : Array.isArray(r) || (r = r.toString());
           for (
             var f = n.bytesToWords(r),
               s = 8 * r.length,
@@ -497,87 +496,91 @@ var MD5 = (function (r) {
               a = -271733879,
               l = -1732584194,
               g = 271733878,
-              h = 0; h < f.length; h++
+              h = 0;
+            h < f.length;
+            h++
           )
             f[h] =
-            (16711935 & ((f[h] << 8) | (f[h] >>> 24))) |
-            (4278255360 & ((f[h] << 24) | (f[h] >>> 8)));
+              (16711935 & ((f[h] << 8) | (f[h] >>> 24))) |
+              (4278255360 & ((f[h] << 24) | (f[h] >>> 8)));
           (f[s >>> 5] |= 128 << s % 32), (f[14 + (((s + 64) >>> 9) << 4)] = s);
           for (
-            var p = i._ff, y = i._gg, v = i._hh, d = i._ii, h = 0; h < f.length; h += 16
+            var p = i._ff, y = i._gg, v = i._hh, d = i._ii, h = 0;
+            h < f.length;
+            h += 16
           ) {
             var b = c,
               T = a,
               x = l,
               B = g;
             (c = p(c, a, l, g, f[h + 0], 7, -680876936)),
-            (g = p(g, c, a, l, f[h + 1], 12, -389564586)),
-            (l = p(l, g, c, a, f[h + 2], 17, 606105819)),
-            (a = p(a, l, g, c, f[h + 3], 22, -1044525330)),
-            (c = p(c, a, l, g, f[h + 4], 7, -176418897)),
-            (g = p(g, c, a, l, f[h + 5], 12, 1200080426)),
-            (l = p(l, g, c, a, f[h + 6], 17, -1473231341)),
-            (a = p(a, l, g, c, f[h + 7], 22, -45705983)),
-            (c = p(c, a, l, g, f[h + 8], 7, 1770035416)),
-            (g = p(g, c, a, l, f[h + 9], 12, -1958414417)),
-            (l = p(l, g, c, a, f[h + 10], 17, -42063)),
-            (a = p(a, l, g, c, f[h + 11], 22, -1990404162)),
-            (c = p(c, a, l, g, f[h + 12], 7, 1804603682)),
-            (g = p(g, c, a, l, f[h + 13], 12, -40341101)),
-            (l = p(l, g, c, a, f[h + 14], 17, -1502002290)),
-            (a = p(a, l, g, c, f[h + 15], 22, 1236535329)),
-            (c = y(c, a, l, g, f[h + 1], 5, -165796510)),
-            (g = y(g, c, a, l, f[h + 6], 9, -1069501632)),
-            (l = y(l, g, c, a, f[h + 11], 14, 643717713)),
-            (a = y(a, l, g, c, f[h + 0], 20, -373897302)),
-            (c = y(c, a, l, g, f[h + 5], 5, -701558691)),
-            (g = y(g, c, a, l, f[h + 10], 9, 38016083)),
-            (l = y(l, g, c, a, f[h + 15], 14, -660478335)),
-            (a = y(a, l, g, c, f[h + 4], 20, -405537848)),
-            (c = y(c, a, l, g, f[h + 9], 5, 568446438)),
-            (g = y(g, c, a, l, f[h + 14], 9, -1019803690)),
-            (l = y(l, g, c, a, f[h + 3], 14, -187363961)),
-            (a = y(a, l, g, c, f[h + 8], 20, 1163531501)),
-            (c = y(c, a, l, g, f[h + 13], 5, -1444681467)),
-            (g = y(g, c, a, l, f[h + 2], 9, -51403784)),
-            (l = y(l, g, c, a, f[h + 7], 14, 1735328473)),
-            (a = y(a, l, g, c, f[h + 12], 20, -1926607734)),
-            (c = v(c, a, l, g, f[h + 5], 4, -378558)),
-            (g = v(g, c, a, l, f[h + 8], 11, -2022574463)),
-            (l = v(l, g, c, a, f[h + 11], 16, 1839030562)),
-            (a = v(a, l, g, c, f[h + 14], 23, -35309556)),
-            (c = v(c, a, l, g, f[h + 1], 4, -1530992060)),
-            (g = v(g, c, a, l, f[h + 4], 11, 1272893353)),
-            (l = v(l, g, c, a, f[h + 7], 16, -155497632)),
-            (a = v(a, l, g, c, f[h + 10], 23, -1094730640)),
-            (c = v(c, a, l, g, f[h + 13], 4, 681279174)),
-            (g = v(g, c, a, l, f[h + 0], 11, -358537222)),
-            (l = v(l, g, c, a, f[h + 3], 16, -722521979)),
-            (a = v(a, l, g, c, f[h + 6], 23, 76029189)),
-            (c = v(c, a, l, g, f[h + 9], 4, -640364487)),
-            (g = v(g, c, a, l, f[h + 12], 11, -421815835)),
-            (l = v(l, g, c, a, f[h + 15], 16, 530742520)),
-            (a = v(a, l, g, c, f[h + 2], 23, -995338651)),
-            (c = d(c, a, l, g, f[h + 0], 6, -198630844)),
-            (g = d(g, c, a, l, f[h + 7], 10, 1126891415)),
-            (l = d(l, g, c, a, f[h + 14], 15, -1416354905)),
-            (a = d(a, l, g, c, f[h + 5], 21, -57434055)),
-            (c = d(c, a, l, g, f[h + 12], 6, 1700485571)),
-            (g = d(g, c, a, l, f[h + 3], 10, -1894986606)),
-            (l = d(l, g, c, a, f[h + 10], 15, -1051523)),
-            (a = d(a, l, g, c, f[h + 1], 21, -2054922799)),
-            (c = d(c, a, l, g, f[h + 8], 6, 1873313359)),
-            (g = d(g, c, a, l, f[h + 15], 10, -30611744)),
-            (l = d(l, g, c, a, f[h + 6], 15, -1560198380)),
-            (a = d(a, l, g, c, f[h + 13], 21, 1309151649)),
-            (c = d(c, a, l, g, f[h + 4], 6, -145523070)),
-            (g = d(g, c, a, l, f[h + 11], 10, -1120210379)),
-            (l = d(l, g, c, a, f[h + 2], 15, 718787259)),
-            (a = d(a, l, g, c, f[h + 9], 21, -343485551)),
-            (c = (c + b) >>> 0),
-            (a = (a + T) >>> 0),
-            (l = (l + x) >>> 0),
-            (g = (g + B) >>> 0);
+              (g = p(g, c, a, l, f[h + 1], 12, -389564586)),
+              (l = p(l, g, c, a, f[h + 2], 17, 606105819)),
+              (a = p(a, l, g, c, f[h + 3], 22, -1044525330)),
+              (c = p(c, a, l, g, f[h + 4], 7, -176418897)),
+              (g = p(g, c, a, l, f[h + 5], 12, 1200080426)),
+              (l = p(l, g, c, a, f[h + 6], 17, -1473231341)),
+              (a = p(a, l, g, c, f[h + 7], 22, -45705983)),
+              (c = p(c, a, l, g, f[h + 8], 7, 1770035416)),
+              (g = p(g, c, a, l, f[h + 9], 12, -1958414417)),
+              (l = p(l, g, c, a, f[h + 10], 17, -42063)),
+              (a = p(a, l, g, c, f[h + 11], 22, -1990404162)),
+              (c = p(c, a, l, g, f[h + 12], 7, 1804603682)),
+              (g = p(g, c, a, l, f[h + 13], 12, -40341101)),
+              (l = p(l, g, c, a, f[h + 14], 17, -1502002290)),
+              (a = p(a, l, g, c, f[h + 15], 22, 1236535329)),
+              (c = y(c, a, l, g, f[h + 1], 5, -165796510)),
+              (g = y(g, c, a, l, f[h + 6], 9, -1069501632)),
+              (l = y(l, g, c, a, f[h + 11], 14, 643717713)),
+              (a = y(a, l, g, c, f[h + 0], 20, -373897302)),
+              (c = y(c, a, l, g, f[h + 5], 5, -701558691)),
+              (g = y(g, c, a, l, f[h + 10], 9, 38016083)),
+              (l = y(l, g, c, a, f[h + 15], 14, -660478335)),
+              (a = y(a, l, g, c, f[h + 4], 20, -405537848)),
+              (c = y(c, a, l, g, f[h + 9], 5, 568446438)),
+              (g = y(g, c, a, l, f[h + 14], 9, -1019803690)),
+              (l = y(l, g, c, a, f[h + 3], 14, -187363961)),
+              (a = y(a, l, g, c, f[h + 8], 20, 1163531501)),
+              (c = y(c, a, l, g, f[h + 13], 5, -1444681467)),
+              (g = y(g, c, a, l, f[h + 2], 9, -51403784)),
+              (l = y(l, g, c, a, f[h + 7], 14, 1735328473)),
+              (a = y(a, l, g, c, f[h + 12], 20, -1926607734)),
+              (c = v(c, a, l, g, f[h + 5], 4, -378558)),
+              (g = v(g, c, a, l, f[h + 8], 11, -2022574463)),
+              (l = v(l, g, c, a, f[h + 11], 16, 1839030562)),
+              (a = v(a, l, g, c, f[h + 14], 23, -35309556)),
+              (c = v(c, a, l, g, f[h + 1], 4, -1530992060)),
+              (g = v(g, c, a, l, f[h + 4], 11, 1272893353)),
+              (l = v(l, g, c, a, f[h + 7], 16, -155497632)),
+              (a = v(a, l, g, c, f[h + 10], 23, -1094730640)),
+              (c = v(c, a, l, g, f[h + 13], 4, 681279174)),
+              (g = v(g, c, a, l, f[h + 0], 11, -358537222)),
+              (l = v(l, g, c, a, f[h + 3], 16, -722521979)),
+              (a = v(a, l, g, c, f[h + 6], 23, 76029189)),
+              (c = v(c, a, l, g, f[h + 9], 4, -640364487)),
+              (g = v(g, c, a, l, f[h + 12], 11, -421815835)),
+              (l = v(l, g, c, a, f[h + 15], 16, 530742520)),
+              (a = v(a, l, g, c, f[h + 2], 23, -995338651)),
+              (c = d(c, a, l, g, f[h + 0], 6, -198630844)),
+              (g = d(g, c, a, l, f[h + 7], 10, 1126891415)),
+              (l = d(l, g, c, a, f[h + 14], 15, -1416354905)),
+              (a = d(a, l, g, c, f[h + 5], 21, -57434055)),
+              (c = d(c, a, l, g, f[h + 12], 6, 1700485571)),
+              (g = d(g, c, a, l, f[h + 3], 10, -1894986606)),
+              (l = d(l, g, c, a, f[h + 10], 15, -1051523)),
+              (a = d(a, l, g, c, f[h + 1], 21, -2054922799)),
+              (c = d(c, a, l, g, f[h + 8], 6, 1873313359)),
+              (g = d(g, c, a, l, f[h + 15], 10, -30611744)),
+              (l = d(l, g, c, a, f[h + 6], 15, -1560198380)),
+              (a = d(a, l, g, c, f[h + 13], 21, 1309151649)),
+              (c = d(c, a, l, g, f[h + 4], 6, -145523070)),
+              (g = d(g, c, a, l, f[h + 11], 10, -1120210379)),
+              (l = d(l, g, c, a, f[h + 2], 15, 718787259)),
+              (a = d(a, l, g, c, f[h + 9], 21, -343485551)),
+              (c = (c + b) >>> 0),
+              (a = (a + T) >>> 0),
+              (l = (l + x) >>> 0),
+              (g = (g + B) >>> 0);
           }
           return n.endian([c, a, l, g]);
         };
@@ -585,36 +588,36 @@ var MD5 = (function (r) {
         var f = r + ((n & t) | (~n & o)) + (e >>> 0) + i;
         return ((f << u) | (f >>> (32 - u))) + n;
       }),
-      (i._gg = function (r, n, t, o, e, u, i) {
-        var f = r + ((n & o) | (t & ~o)) + (e >>> 0) + i;
-        return ((f << u) | (f >>> (32 - u))) + n;
-      }),
-      (i._hh = function (r, n, t, o, e, u, i) {
-        var f = r + (n ^ t ^ o) + (e >>> 0) + i;
-        return ((f << u) | (f >>> (32 - u))) + n;
-      }),
-      (i._ii = function (r, n, t, o, e, u, i) {
-        var f = r + (t ^ (n | ~o)) + (e >>> 0) + i;
-        return ((f << u) | (f >>> (32 - u))) + n;
-      }),
-      (i._blocksize = 16),
-      (i._digestsize = 16),
-      (r.exports = function (r, t) {
-        if (void 0 === r || null === r)
-          throw new Error("Illegal argument " + r);
-        var o = n.wordsToBytes(i(r, t));
-        return t && t.asBytes ?
-          o :
-          t && t.asString ?
-          u.bytesToString(o) :
-          n.bytesToHex(o);
-      });
+        (i._gg = function (r, n, t, o, e, u, i) {
+          var f = r + ((n & o) | (t & ~o)) + (e >>> 0) + i;
+          return ((f << u) | (f >>> (32 - u))) + n;
+        }),
+        (i._hh = function (r, n, t, o, e, u, i) {
+          var f = r + (n ^ t ^ o) + (e >>> 0) + i;
+          return ((f << u) | (f >>> (32 - u))) + n;
+        }),
+        (i._ii = function (r, n, t, o, e, u, i) {
+          var f = r + (t ^ (n | ~o)) + (e >>> 0) + i;
+          return ((f << u) | (f >>> (32 - u))) + n;
+        }),
+        (i._blocksize = 16),
+        (i._digestsize = 16),
+        (r.exports = function (r, t) {
+          if (void 0 === r || null === r)
+            throw new Error("Illegal argument " + r);
+          var o = n.wordsToBytes(i(r, t));
+          return t && t.asBytes
+            ? o
+            : t && t.asString
+            ? u.bytesToString(o)
+            : n.bytesToHex(o);
+        });
     })();
   },
   function (r, n) {
     !(function () {
       var n =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
         t = {
           rotl: function (r, n) {
             return (r << n) | (r >>> (32 - n));
@@ -646,7 +649,7 @@ var MD5 = (function (r) {
           bytesToHex: function (r) {
             for (var n = [], t = 0; t < r.length; t++)
               n.push((r[t] >>> 4).toString(16)),
-              n.push((15 & r[t]).toString(16));
+                n.push((15 & r[t]).toString(16));
             return n.join("");
           },
           hexToBytes: function (r) {
@@ -657,23 +660,25 @@ var MD5 = (function (r) {
           bytesToBase64: function (r) {
             for (var t = [], o = 0; o < r.length; o += 3)
               for (
-                var e = (r[o] << 16) | (r[o + 1] << 8) | r[o + 2], u = 0; u < 4; u++
+                var e = (r[o] << 16) | (r[o + 1] << 8) | r[o + 2], u = 0;
+                u < 4;
+                u++
               )
-                8 * o + 6 * u <= 8 * r.length ?
-                t.push(n.charAt((e >>> (6 * (3 - u))) & 63)) :
-                t.push("=");
+                8 * o + 6 * u <= 8 * r.length
+                  ? t.push(n.charAt((e >>> (6 * (3 - u))) & 63))
+                  : t.push("=");
             return t.join("");
           },
           base64ToBytes: function (r) {
             r = r.replace(/[^A-Z0-9+\/]/gi, "");
             for (var t = [], o = 0, e = 0; o < r.length; e = ++o % 4)
               0 != e &&
-              t.push(
-                ((n.indexOf(r.charAt(o - 1)) &
+                t.push(
+                  ((n.indexOf(r.charAt(o - 1)) &
                     (Math.pow(2, -2 * e + 8) - 1)) <<
-                  (2 * e)) |
-                (n.indexOf(r.charAt(o)) >>> (6 - 2 * e))
-              );
+                    (2 * e)) |
+                    (n.indexOf(r.charAt(o)) >>> (6 - 2 * e))
+                );
             return t;
           },
         };
@@ -710,5 +715,6 @@ var MD5 = (function (r) {
     r.exports = t(1);
   },
 ]);
+
 
 export default Uploader;
