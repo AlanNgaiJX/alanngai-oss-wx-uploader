@@ -210,7 +210,6 @@ class Uploader {
           callback: _this.signatureInfo.callback,
         },
         success: (res) => {
-          console.log(res);
           if (res.statusCode == 200 && res.data) {
             const response = JSON.parse(res.data);
             const data = response.data;
