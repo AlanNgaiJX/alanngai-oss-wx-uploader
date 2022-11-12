@@ -1,6 +1,6 @@
 {
   "name": "alanngai-oss-wx-uploader",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "vue router refresh helper",
   "main": "dist/alanngai-oss-wx-uploader.js",
   "scripts": {
