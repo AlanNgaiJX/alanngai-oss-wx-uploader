@@ -108,11 +108,19 @@ class Uploader {
         const uploadTask = _this.waitingQueue.shift();
 
         // 压缩图片
-        if (_this.maxSideWidth) {
-          const resultFilePath = await Uploader.compressImage(uploadTask.filePath, _this.maxSideWidth);
-          uploadTask.filePath = resultFilePath
+        if (_this.maxSideWidth && !uploadTask.isCompressed) {
+          try {
+            const resultFilePath = await Uploader.compressImage(uploadTask.filePath, _this.maxSideWidth);
+            uploadTask.filePath = resultFilePath;
+            uploadTask.isCompressed = true
+          } catch (error) {
+            onUploadError(uploadTask, 2);
+            // 检测上传队列
+            _this.checkQueueList();
+            return false;
+          }
         }
-  
+
         _this.uploadingQueue.push(uploadTask);
         onUploadUploading(uploadTask);
         getSignature()
@@ -325,7 +333,9 @@ class Uploader {
     }
 
     // 失败回调处理器
-    function onUploadError(uploadTask) {
+    function onUploadError(uploadTask, failType = 1) {
+      // failType 1 上传出错 ； 2 压缩出错
+      uploadTask.failType = failType;
       onUploadProgress(uploadTask, "fail");
       _this.errorQueue.push(uploadTask);
 
@@ -379,7 +389,8 @@ class Uploader {
         url,
         suffix,
         filePath,
-        md5
+        md5,
+        isCompressed
       } = uploadTask;
       const _uploadTask = {
         id,
@@ -387,6 +398,7 @@ class Uploader {
         suffix,
         filePath,
         md5,
+        isCompressed,
         status: "md5",
       };
 
@@ -442,7 +454,9 @@ class Uploader {
           wx.compressImage({
             src,
             [width > height ? 'compressedWidth' : 'compressHeight']: maxSideWidth,
-            success: ({tempFilePath}) => {
+            success: ({
+              tempFilePath
+            }) => {
               if (!tempFilePath) {
                 reject()
               } else {
